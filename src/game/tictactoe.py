@@ -82,4 +82,3 @@ class TicTacToe:
         board_repr = [transl[i] for i in self.board]
         print((row + hr + row + hr + row).format(*board_repr))
 
-
