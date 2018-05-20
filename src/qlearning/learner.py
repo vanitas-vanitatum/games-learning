@@ -11,12 +11,17 @@ class Learner:
         self.game = game
         self.player_to_learn = player_to_learn
         self.memory = []
+        self.steps_done = 0
+
+        self.epsilon_initial_value = 0.9
+        self.epsilon_final_value = 0.05
+        self.decay_step = 200
 
         self._rng = np.random.RandomState(seed)
 
     def fit(self, num_episodes, learning_rate, discount):
         for episode in tqdm.tqdm(range(num_episodes)):
-            self.evaluate_episode()
+            self.evaluate_episode(episode)
             self.update_player_values(learning_rate, discount)
 
     def update_player_values(self, learning_rate, discount):
@@ -33,7 +38,7 @@ class Learner:
             )
             discount *= discount
 
-    def evaluate_episode(self):
+    def evaluate_episode(self, episode_num):
         self.game.start_game()
         while not self.game.is_game_terminal():
             current_state = self.game.board.board_state(self.player_to_learn.my_symb)
@@ -41,8 +46,12 @@ class Learner:
                 player = self.game.player_x
             else:
                 player = self.game.player_o
-
-            action = player.move(self.game.board)
+            sample = self._rng.uniform()
+            eps_threshold = self.epsilon_final_value + (self.epsilon_initial_value - self.epsilon_final_value) * np.exp(-1 * episode_num / self.decay_step)
+            if sample > eps_threshold:
+                action = player.move(self.game.board)
+            else:
+                action = player.get_random_action_for_state(self.game.board)
             reward = self.game.apply_action(action)
             new_state = self.game.board.board_state(self.player_to_learn.my_symb)
             self.game.player_x_turn = not self.game.player_x_turn

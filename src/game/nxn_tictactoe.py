@@ -1,7 +1,5 @@
 import random
 
-import numpy as np
-
 
 class Board:
     X = 1

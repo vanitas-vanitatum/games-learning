@@ -87,6 +87,12 @@ class QPlayer(Player):
 
         return result
 
+    def get_random_action_for_state(self, board):
+        all_actions = [
+            Action(row, col, self.my_symb) for row, col in board.get_legal_moves()
+        ]
+        return random.choice(all_actions)
+
     def add_value(self, state, action, value):
         self.state_action_mapping[(state, action)] += value
 
