@@ -1,4 +1,5 @@
 import random
+
 import numpy as np
 
 
@@ -27,7 +28,7 @@ class Board:
         self.win_cells = []
 
     def board_state(self, current_player_symbol):
-        return np.asarray([current_player_symbol] + self.data)
+        return tuple([current_player_symbol] + self.data)
 
     def __str__(self):
         out = ""
@@ -138,67 +139,79 @@ class Board:
                 if col < self.n - 1:
                     out += '|'
             if row < self.n - 1:
-                out += '\n' + '---'*self.n + '-'*(self.n-1)+'\n'
+                out += '\n' + '---' * self.n + '-' * (self.n - 1) + '\n'
             else:
                 out += '\n'
         print(out)
 
 
 class TicTacToe:
-    def __init__(self, board, playerX, playerO):
+    def __init__(self, board, player_x, player_o):
 
         self.board = board
-        self.playerX = playerX
-        self.playerO = playerO
-        self.playerX_turn = None
+        self.player_x = player_x
+        self.player_o = player_o
+        self.player_x_turn = None
+        self.game_finished = False
 
-    def play_game(self, playerXstarts=None, display=True):
-        self.playerX.start_game(Board.X)
-        self.playerO.start_game(Board.O)
-        self.board.reset()
-        if playerXstarts is None:
-            self.playerX_turn = random.choice([True, False])
-        else:
-            self.playerX_turn = playerXstarts
+    def play_game(self, player_x_starts=None, display=True):
+        self.start_game(player_x_starts)
 
-        print("New game. {}x{} board, connect {} to win.".format(
-            self.board.n, self.board.n, self.board.win_combo_size))
+        if display:
+            print("New game. {}x{} board, connect {} to win.".format(
+                self.board.n, self.board.n, self.board.win_combo_size))
 
         if display:
             self.board.display_board()
 
-        game_finished = False
-        while not game_finished:
-            if self.playerX_turn:
-                player, symbol, opponent = self.playerX, Board.X, self.playerO
+        while not self.game_finished:
+            if self.player_x_turn:
+                player, symbol, opponent, opponent_symbol = self.player_x, Board.X, self.player_o, Board.O
             else:
-                player, symbol, opponent = self.playerO, Board.O, self.playerX
+                player, symbol, opponent, opponent_symbol = self.player_o, Board.O, self.player_x, Board.X
 
-            if player.breed == "human":
+            if player.breed == "human" and display:
                 self.board.display_board()
 
-            ind = player.move(self.board.data)
-            if type(ind) == tuple:
-                row, col = ind
-            else:
-                row, col = ind // self.board.n, ind % self.board.n
+            action = player.move(self.board)
+            reward = self.apply_action(action)
+            multiplier = self.moving_player_to_multiplier(symbol)
+            player.reward(reward * multiplier, self.board.board_state(symbol))
+            opponent.reward(reward * -multiplier, self.board.board_state(symbol))
+            self.player_x_turn = not self.player_x_turn
 
-            if self.board.get(row, col) != Board.EMPTY:  # illegal move
-                player.reward(-99, self.board)  # score of shame
-                game_finished = True
-            else:
-                self.board.set(row, col, symbol)
-                if self.board.is_move_winning(row, col, symbol):
-                    player.reward(1, self.board.board_state(symbol))
-                    opponent.reward(-1, self.board.board_state(symbol))
-                    game_finished = True
-                elif self.board.is_board_full():  # tie game
-                    player.reward(0.5, self.board.board_state(symbol))
-                    opponent.reward(0.5, self.board.board_state(symbol))
-                    game_finished = True
-                else:
-                    opponent.reward(0, self.board.board_state(symbol))
-                    self.playerX_turn = not self.playerX_turn
+        if display:
+            print('Game finished')
+            self.board.display_board()
 
-        print('Game finished')
-        self.board.display_board()
+    def start_game(self, player_x_starts=None):
+        self.player_x.start_game(Board.X)
+        self.player_o.start_game(Board.O)
+        self.board.reset()
+        self.game_finished = False
+        if player_x_starts is None:
+            self.player_x_turn = random.choice([True, False])
+        else:
+            self.player_x_turn = player_x_starts
+
+    def is_game_terminal(self):
+        return self.game_finished
+
+    def apply_action(self, action):
+        row, col, symbol = action
+        if self.board.get(row, col) != Board.EMPTY:
+            self.game_finished = True
+            return -99
+        self.board.set(row, col, symbol)
+        if self.board.is_move_winning(row, col, symbol):
+            self.game_finished = True
+            return 1
+        elif self.board.is_board_full():
+            self.game_finished = True
+            return 0.5
+        else:
+            return 0
+
+    def moving_player_to_multiplier(self, moving_symbol):
+        return 1 if (self.player_x_turn and moving_symbol == Board.X) or (
+                not self.player_x_turn and moving_symbol == Board.O) else -1

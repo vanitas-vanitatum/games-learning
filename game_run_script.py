@@ -1,10 +1,15 @@
 NxN = True
+from pprint import pprint
 
 if NxN:
     from src.game.nxn_tictactoe import TicTacToe, Board
-    from src.game.player import HumanPlayer, RandomPlayer, MinMaxPlayer
+    from src.game.player import HumanPlayer, RandomPlayer, MinMaxPlayer, QPlayer
+    from src.qlearning import Learner
 
-    t = TicTacToe(HumanPlayer(), RandomPlayer())
+    q = QPlayer(5)
+    Learner(TicTacToe(Board(3, 3), q, q), q).fit(10000, 0.1, 0.99)
+    pprint(q.state_action_mapping)
+    t = TicTacToe(Board(3, 3), HumanPlayer(), q)
     t.play_game()
 else:
     from src.game.tictactoe import TicTacToe
