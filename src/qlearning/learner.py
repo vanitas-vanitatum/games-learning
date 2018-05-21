@@ -6,66 +6,65 @@ from src.game.player import QPlayer
 
 
 class Learner:
-    def __init__(self, game, player_to_learn, seed=None):
+    def __init__(self, game, player_to_learn, learning_rate=0.1, discount=0.9, seed=None):
         assert isinstance(player_to_learn, QPlayer)
         self.game = game
         self.player_to_learn = player_to_learn
-        self.memory = []
         self.steps_done = 0
 
         self.epsilon_initial_value = 0.9
         self.epsilon_final_value = 0.05
         self.decay_step = 200
 
+        self.learning_rate = learning_rate
+        self.discount = discount
+        self.temporary_discount = discount
         self._rng = np.random.RandomState(seed)
 
-    def fit(self, num_episodes, learning_rate, discount):
+    def reset(self):
+        self.temporary_discount = self.discount
+
+    def fit(self, num_episodes):
         for episode in tqdm.tqdm(range(num_episodes)):
+            self.reset()
             self.evaluate_episode(episode)
-            self.update_player_values(learning_rate, discount)
+            # self.update_player_values()
 
-    def update_player_values(self, learning_rate, discount):
-        while len(self.memory) > 0:
-            previous_state, new_state, action, reward = self.pop()
+    def update_player_values(self, previous_state, new_state, action, reward):
+        new_state_value = self.player_to_learn.get_max_q_value_for_state(self.game.board)
+        current_qvalue = self.player_to_learn.get_q_value(previous_state, action)
 
-            new_state_value = self.player_to_learn.get_q_value(new_state, action)
-            current_qvalue = self.player_to_learn.get_q_value(previous_state, action)
+        updated_value = current_qvalue + self.learning_rate * (
+                reward + self.temporary_discount * new_state_value - current_qvalue)
 
-            updated_value = (1 - learning_rate) * current_qvalue + learning_rate * (reward + discount * new_state_value)
-
-            self.player_to_learn.set_value(
-                previous_state, action, updated_value
-            )
-            discount *= discount
+        self.player_to_learn.set_value(
+            previous_state, action, updated_value
+        )
+        self.temporary_discount *= self.discount
 
     def evaluate_episode(self, episode_num):
         self.game.start_game()
         while not self.game.is_game_terminal():
-            current_state = self.game.board.board_state(self.player_to_learn.my_symb)
+            current_state = self.game.board.board_state()
             if self.game.player_x_turn:
                 player = self.game.player_x
             else:
                 player = self.game.player_o
             sample = self._rng.uniform()
-            eps_threshold = self.epsilon_final_value + (self.epsilon_initial_value - self.epsilon_final_value) * np.exp(-1 * episode_num / self.decay_step)
+            eps_threshold = self.epsilon_final_value + (self.epsilon_initial_value - self.epsilon_final_value) * np.exp(
+                -1 * episode_num / self.decay_step)
             if sample > eps_threshold:
                 action = player.move(self.game.board)
             else:
                 action = player.get_random_action_for_state(self.game.board)
+            # action = player.move(self.game.board)
             reward = self.game.apply_action(action)
-            new_state = self.game.board.board_state(self.player_to_learn.my_symb)
+            self.game.board.change_moving_player()
             self.game.player_x_turn = not self.game.player_x_turn
-
-            self.push((current_state, new_state, action, reward))
-
-    def pop(self):
-        return self.memory.pop(-1)
-
-    def push(self, elem):
-        return self.memory.append(elem)
-
-    def clear(self):
-        return self.memory.clear()
+            new_state = self.game.board.board_state()
+            self.update_player_values(current_state, new_state, action, reward)
+            # import ipdb
+            # ipdb.set_trace()
 
 
 if __name__ == '__main__':

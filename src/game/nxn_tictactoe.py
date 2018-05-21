@@ -1,4 +1,5 @@
 import random
+import numpy as np
 
 
 class Board:
@@ -18,6 +19,7 @@ class Board:
         self.win_combo_size = win_combo_size
         self.size = n * n
         self.turns, self.data, self.win_cells = None, None, None
+        self.moving_player = 0
         self.reset()
 
     def reset(self):
@@ -25,8 +27,8 @@ class Board:
         self.data = [Board.EMPTY] * self.size
         self.win_cells = []
 
-    def board_state(self, current_player_symbol):
-        return tuple([current_player_symbol] + self.data)
+    def board_state(self):
+        return tuple([self.moving_player] + self.data)
 
     def __str__(self):
         out = ""
@@ -125,6 +127,16 @@ class Board:
                     moves += [(row, col)]
         return moves
 
+    @staticmethod
+    def get_legal_moves_for_state(state):
+        moves = []
+        n = np.sqrt(len(state)).astype(np.int)
+        for row in range(n):
+            for col in range(n):
+                if state[row * n + col] == Board.EMPTY:
+                    moves += [(row, col)]
+        return moves
+
     def display_board(self):
         out = ""
         translator = {Board.X: 'X',
@@ -141,6 +153,9 @@ class Board:
             else:
                 out += '\n'
         print(out)
+
+    def change_moving_player(self):
+        self.moving_player = Board.X if self.moving_player == Board.O else Board.O
 
 
 class TicTacToe:
@@ -174,9 +189,10 @@ class TicTacToe:
             action = player.move(self.board)
             reward = self.apply_action(action)
             multiplier = self.moving_player_to_multiplier(symbol)
-            player.reward(reward * multiplier, self.board.board_state(symbol))
-            opponent.reward(reward * -multiplier, self.board.board_state(symbol))
+            player.reward(reward * multiplier, self.board.board_state())
+            opponent.reward(reward * -multiplier, self.board.board_state())
             self.player_x_turn = not self.player_x_turn
+            self.board.change_moving_player()
 
         if display:
             print('Game finished')
@@ -192,6 +208,11 @@ class TicTacToe:
         else:
             self.player_x_turn = player_x_starts
 
+        if self.player_x_turn:
+            self.board.moving_player = Board.X
+        else:
+            self.board.moving_player = Board.O
+
     def is_game_terminal(self):
         return self.game_finished
 
@@ -203,7 +224,7 @@ class TicTacToe:
         self.board.set(row, col, symbol)
         if self.board.is_move_winning(row, col, symbol):
             self.game_finished = True
-            return 1
+            return 10 if symbol == self.board.moving_player else -10
         elif self.board.is_board_full():
             self.game_finished = True
             return 0.5

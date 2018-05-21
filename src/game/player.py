@@ -33,9 +33,9 @@ class HumanPlayer(Player):
         super().__init__('human')
 
     def move(self, board):
-        ind = int(input("Your move? "))
+        row_col = input("Your move? ")
 
-        row, col = ind // board.n, ind % board.n
+        row, col = map(int, row_col.split(','))
         return Action(row, col, self.my_symb)
 
     def reward(self, value, board):
@@ -60,8 +60,8 @@ class QPlayer(Player):
         self.state_action_mapping = defaultdict(lambda: float(q_initial_value))
         self.q_initial_value = q_initial_value
 
-    def get_max_action_for_state(self, board):
-        action_value_mapping = self.get_action_value_for_state(board)
+    def get_max_action_for_state(self, state):
+        action_value_mapping = self.get_action_value_for_state(state)
         best_moves = []
         best_value = -np.inf
         for action, qvalue in action_value_mapping.items():
@@ -72,12 +72,22 @@ class QPlayer(Player):
                 best_moves.append(action)
         return random.choice(best_moves)
 
+    def get_max_q_value_for_state(self, board):
+        all_actions = [
+            Action(row, col, self.my_symb) for row, col in board.get_legal_moves()
+        ]
+        max_value = -np.inf
+        state = board.board_state()
+        for act in all_actions:
+            max_value = max(max_value, self.state_action_mapping[(state, act)])
+        return max_value
+
     def get_action_value_for_state(self, board):
         all_actions = [
             Action(row, col, self.my_symb) for row, col in board.get_legal_moves()
         ]
         result = {}
-        state = board.board_state(self.my_symb)
+        state = board.board_state()
         for (s, action), value in self.state_action_mapping.items():
             if s == state:
                 result[action] = value

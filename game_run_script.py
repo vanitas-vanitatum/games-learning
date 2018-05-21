@@ -6,9 +6,10 @@ if NxN:
     from src.game.player import HumanPlayer, RandomPlayer, MinMaxPlayer, QPlayer
     from src.qlearning import Learner
 
-    q = QPlayer(5)
-    Learner(TicTacToe(Board(3, 3), q, q), q).fit(10000, 0.1, 0.99)
+    q = QPlayer(0)
+    Learner(TicTacToe(Board(3, 3), q, q), q).fit(10000)
     pprint(q.state_action_mapping)
+    print(len(q.state_action_mapping.keys()))
     t = TicTacToe(Board(3, 3), HumanPlayer(), q)
     t.play_game()
 else:
