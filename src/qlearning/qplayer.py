@@ -17,6 +17,10 @@ class QPlayer(Player):
         self.last_state_action_as_X = None, None
         self.last_state_action_as_O = None, None
 
+    def start_game(self, symbol):
+        self.last_state_action_as_X = None, None
+        self.last_state_action_as_O = None, None
+
     def move(self, board, rand=False):
         if not rand:
             action = self.get_max_action_for_state(board)
@@ -46,26 +50,18 @@ class QPlayer(Player):
         result.update(self.Q[board.board_state()])
         return result
 
-    def update_Q(self, reward, new_board, learning_rate, temporary_discount):
-        if new_board.moving_player == new_board.X:
-            previous_state, action = self.last_state_action_as_X
+    def update_Q(self, reward, new_board, learn_rate, discount):
+        is_X = new_board.moving_player == new_board.X
+        previous_state, action = self.last_state_action_as_X if is_X else self.last_state_action_as_O
+        q_prev = self.Q[previous_state][action]
+        possible_q = self.get_possible_q_values_for_board(new_board)
+
+        if possible_q:
+            max_q = max(possible_q)
         else:
-            previous_state, action = self.last_state_action_as_O
+            max_q = 0
 
-        q_previous = self.Q[previous_state][action]
-        possible_qs_next = self.get_possible_q_values_for_board(new_board)
-        if possible_qs_next:
-            max_q_new = max(possible_qs_next)
-        else:
-            max_q_new = 0
-
-        updated_value = (q_previous
-                         + (learning_rate
-                            * (reward
-                               + (temporary_discount
-                                  * max_q_new)
-                               - q_previous)))
-
+        updated_value = (q_prev + (learn_rate * (reward + (discount * max_q) - q_prev)))
         self.Q[previous_state][action] = updated_value
 
     def get_possible_q_values_for_board(self, board):
@@ -89,8 +85,17 @@ class QPlayer(Player):
 
     def save_Q(self, file_name):  #save table
         with open(file_name, 'wb') as handle:
-            pickle.dump(self.Q, handle, protocol=pickle.HIGHEST_PROTOCOL)
+            g = dict(self.Q)
+            for k in g:
+                g[k] = dict(g[k])
+            pickle.dump(g, handle, protocol=pickle.HIGHEST_PROTOCOL)
 
     def load_Q(self, file_name):  #save table
         with open(file_name, 'rb') as handle:
-            self.Q = pickle.load(handle)
+            Q = pickle.load(handle)
+        self.Q = defaultdict(lambda:
+                             defaultdict(lambda:
+                                         float(self.q_initial_value)))
+        for state in Q:
+            for action in Q[state]:
+                self.Q[state][action] = Q[state][action]

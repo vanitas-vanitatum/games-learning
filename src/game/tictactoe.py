@@ -77,10 +77,11 @@ class TicTacToe:
         if self.board.get(row, col) != Board.EMPTY:
             self.game_finished = True
             return Reward.ILLEGAL
+
         self.board.set(row, col, self.board.moving_player)
         if self.board.is_move_winning(row, col, self.board.moving_player):
             self.game_finished = True
-            return Reward.WIN if self.board.moving_player == self.board.moving_player else Reward.LOOSE
+            return Reward.WIN
         elif self.board.is_board_full():
             self.game_finished = True
             return Reward.DRAW

@@ -47,9 +47,12 @@ class RandomPlayer(Player):
     def reward(self, value, board):
         pass
 
-    def move(self, board):
+    def move(self, board, rand=False):
         row, col = random.choice(self.available_moves(board))
         return Action(row, col)
+
+    def update_Q(self, reward, new_board, learning_rate, temporary_discount):
+        pass
 
 
 '''

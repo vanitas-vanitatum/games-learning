@@ -55,6 +55,8 @@ class Board:
 
     def get_legal_moves(self):
         moves = []
+        if self.winner is not None:
+            return moves
         for row in range(self.n):
             for col in range(self.n):
                 if self.get(row, col) == Board.EMPTY:
@@ -81,6 +83,18 @@ class Board:
 
     def change_moving_player(self):
         self.moving_player = Board.X if self.moving_player == Board.O else Board.O
+
+    def parse_state(self, moving_player, state_string):
+        self.moving_player = moving_player
+        for r in range(self.n):
+            for c in range(self.n):
+                symb, *state_string = state_string
+                if symb == 'X' or symb == 'x':
+                    self.set(r, c, 1)
+                elif symb == 'O' or symb == 'o':
+                    self.set(r, c, -1)
+                else:
+                    self.set(r, c, 0)
 
 
 class BoardChecker:
