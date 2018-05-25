@@ -1,8 +1,9 @@
 import numpy as np
 import random
-from src.game.nxn_tictactoe import Action
+from src.game.action import Action
 from collections import defaultdict
 from src.game.player import Player
+import pickle
 
 
 class QPlayer(Player):
@@ -17,14 +18,16 @@ class QPlayer(Player):
         self.last_state_action_as_O = None, None
 
     def move(self, board, rand=False):
-        if rand:
-            action = self.get_random_action_for_state(board)
-        else:
+        if not rand:
             action = self.get_max_action_for_state(board)
+        else:
+            action = self.get_random_action_for_state(board)
+
         if board.moving_player == board.X:
             self.last_state_action_as_X = (board.board_state(), action)
         else:
             self.last_state_action_as_O = (board.board_state(), action)
+
         return action
 
     def get_max_action_for_state(self, state):
@@ -32,6 +35,16 @@ class QPlayer(Player):
         mx_q = max(Q_s.values())
         best_moves = [k for k in Q_s if Q_s[k] == mx_q]
         return random.choice(best_moves)
+
+    def get_random_action_for_state(self, board):
+        all_actions = [Action(row, col) for row, col in board.get_legal_moves()]
+        return random.choice(all_actions)
+
+    def get_action_value_for_state(self, board):
+        result = {Action(row, col): self.q_initial_value
+                  for row, col in board.get_legal_moves()}
+        result.update(self.Q[board.board_state()])
+        return result
 
     def update_Q(self, reward, new_board, learning_rate, temporary_discount):
         if new_board.moving_player == new_board.X:
@@ -54,7 +67,6 @@ class QPlayer(Player):
                                - q_previous)))
 
         self.Q[previous_state][action] = updated_value
-        # self.temporary_discount *= self.discount
 
     def get_possible_q_values_for_board(self, board):
         possible_moves = board.get_legal_moves()
@@ -64,35 +76,21 @@ class QPlayer(Player):
             q_values.append(self.q_initial_value)
         return q_values
 
-    def get_action_value_for_state(self, board):
-        result = {Action(row, col): self.q_initial_value
-                  for row, col in board.get_legal_moves()}
-        result.update(self.Q[board.board_state()])
-        return result
-
     def get_max_q_value_for_state(self, board):
-        return self._get_max_min_q_value_for_state(board, max)
-
-    def _get_max_min_q_value_for_state(self, board, maxmin=max):
-        all_actions = [Action(row, col) for row, col in board.get_legal_moves()]
-        max_value = -np.inf if maxmin == max else np.inf
-        state = board.board_state()
-        for act in all_actions:
-            max_value = maxmin(max_value, self.Q[state][act])
-        return max_value
-
-    def get_random_action_for_state(self, board):
-        all_actions = [Action(row, col) for row, col in board.get_legal_moves()]
-        return random.choice(all_actions)
-
-    def add_value(self, state, action, value):
-        self.Q[state][action] += value
-
-    def set_value(self, state, action, value):
-        self.Q[state][action] = value
-
-    def get_q_value(self, state, action):
-        return self.Q[state][action]
+        possible_qs = self.get_possible_q_values_for_board(board)
+        if possible_qs:
+            max_q = max(possible_qs)
+        else:
+            max_q = 0
+        return max_q
 
     def reward(self, value, board):
         pass
+
+    def save_Q(self, file_name):  #save table
+        with open(file_name, 'wb') as handle:
+            pickle.dump(self.Q, handle, protocol=pickle.HIGHEST_PROTOCOL)
+
+    def load_Q(self, file_name):  #save table
+        with open(file_name, 'rb') as handle:
+            self.Q = pickle.load(handle)

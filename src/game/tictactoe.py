@@ -1,84 +1,94 @@
-import numpy as np
 import random
+
+from src.game.board import Board
+from src.game.rewards import Reward
 
 
 class TicTacToe:
-    """
-    Based on:
-    https://gist.github.com/fheisler/430e70fa249ba30e707f
-    """
-    X = 1
-    O = -1
-    EMPTY = 0
+    def __init__(self, board, player_x, player_o):
 
-    WIN_COMBOS = [(0, 1, 2), (3, 4, 5), (6, 7, 8),  # horizontal
-                  (0, 3, 6), (1, 4, 7), (2, 5, 8),  # vertical
-                  (0, 4, 8), (2, 4, 6)]             # diagonal
+        self.board = board
+        self.player_x = player_x
+        self.player_o = player_o
+        self.player_x_turn = None
+        self.game_finished = False
 
-    def __init__(self, playerX, playerO):
-        self.board = [TicTacToe.EMPTY] * 9
-        self.playerX, self.playerO = playerX, playerO
-        self.playerX_turn = random.choice([True, False])
+    def play_game(self, player_x_starts=None, verbose=False):
+        self.start_game(player_x_starts)
+        verbose = self.player_x.breed == 'human' or self.player_o.breed == 'human' or verbose
 
-    @property
-    def game_state(self):
-        current_symbol = TicTacToe.X if self.playerX_turn else TicTacToe.O
-        return np.asarray([current_symbol]+self.board)
+        if verbose:
+            print("New game. {}x{} board, connect {} to win.".format(
+                self.board.n, self.board.n, self.board.win_combo_size))
 
-    def play_game(self):
-        self.playerX.start_game(TicTacToe.X)
-        self.playerO.start_game(TicTacToe.O)
-        game_finished = False
-        while not game_finished:  # yolo
-            if self.playerX_turn:
-                player, symbol, opponent = self.playerX, TicTacToe.X, self.playerO
+        if verbose:
+            self.board.display_board()
+
+        while not self.game_finished:
+            if self.player_x_turn:
+                player, symbol, opponent, opponent_symbol = self.player_x, Board.X, self.player_o, Board.O
             else:
-                player, symbol, opponent = self.playerO, TicTacToe.O, self.playerX
+                player, symbol, opponent, opponent_symbol = self.player_o, Board.O, self.player_x, Board.X
 
-            if player.breed == "human":
-                self.display_board()
+            if player.breed == "human" or verbose:
+                self.board.display_board()
 
-            placing_index = player.move(self.board)
-
-            if self.board[placing_index] != TicTacToe.EMPTY:  # illegal move
-                player.reward(-99, self.board)  # score of shame
-                game_finished = True
-            else:
-                self.board[placing_index] = symbol
-                if TicTacToe.player_wins(self.board, symbol):
-                    player.reward(1, self.board)
-                    opponent.reward(-1, self.board)
-                    game_finished = True
-                elif TicTacToe.board_full(self.board):  # tie game
-                    player.reward(0.5, self.board)
-                    opponent.reward(0.5, self.board)
-                    game_finished = True
+            action = player.move(self.board)
+            reward = self.apply_action(action)
+            if self.game_finished:
+                if reward == Reward.WIN:
+                    winner = 'X' if self.board.get_winner() == Board.X else 'O'
                 else:
-                    opponent.reward(0, self.board)
-                    self.playerX_turn = not self.playerX_turn
+                    winner = 'DRAW'
+            self.change_turns()
 
-    @staticmethod
-    def player_wins(board, symbol):
-        for combo in TicTacToe.WIN_COMBOS:
-            if all([board[i] == symbol for i in combo]):
-                return True
-        return False
+            player.reward(reward, self.board.board_state())
+            opponent.reward(reward, self.board.board_state())
 
-    @staticmethod
-    def board_full(board):
-        return all([place != TicTacToe.EMPTY for place in board])
+        if verbose:
+            self.board.display_board()
+            print('Game finished')
+            print(f'Winner is: {winner}')
 
-    @staticmethod
-    def available_moves(board):
-        return [i for i in range(len(board)) if board[i] == TicTacToe.EMPTY]
+    def change_turns(self):
+        self.player_x_turn = not self.player_x_turn
+        self.board.change_moving_player()
 
-    def display_board(self):
-        row = " {} | {} | {}"
-        hr = "\n-----------\n"
+    def start_game(self, player_x_starts=None):
+        self.player_x.start_game(Board.X)
+        self.player_o.start_game(Board.O)
+        self.board.reset()
+        self.game_finished = False
+        if player_x_starts is None:
+            self.player_x_turn = random.choice([True, False])
+        else:
+            self.player_x_turn = player_x_starts
 
-        transl = {TicTacToe.X: 'X',
-                  TicTacToe.O: 'O',
-                  TicTacToe.EMPTY: ' '}
-        board_repr = [transl[i] for i in self.board]
-        print((row + hr + row + hr + row).format(*board_repr))
+        if self.player_x_turn:
+            self.board.moving_player = Board.X
+        else:
+            self.board.moving_player = Board.O
+
+    def is_terminal(self):
+        return self.game_finished
+
+    def apply_action(self, action):
+        row, col = action
+        if self.board.get(row, col) != Board.EMPTY:
+            self.game_finished = True
+            return Reward.ILLEGAL
+        self.board.set(row, col, self.board.moving_player)
+        if self.board.is_move_winning(row, col, self.board.moving_player):
+            self.game_finished = True
+            return Reward.WIN if self.board.moving_player == self.board.moving_player else Reward.LOOSE
+        elif self.board.is_board_full():
+            self.game_finished = True
+            return Reward.DRAW
+        else:
+            return Reward.NONE
+
+    def moving_player_to_multiplier(self, moving_symbol):
+        return 1 if (self.player_x_turn and moving_symbol == Board.X) or (
+                not self.player_x_turn and moving_symbol == Board.O) else -1
+
 

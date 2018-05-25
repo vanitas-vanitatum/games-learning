@@ -1,8 +1,9 @@
 import numpy as np
 import tqdm
 
-from src.game.nxn_tictactoe import TicTacToe, Board
-from src.game.qplayer import QPlayer
+from src.game.tictactoe import TicTacToe
+from src.game.board import Board
+from src.qlearning.qplayer import QPlayer
 from src.game.rewards import Reward
 
 

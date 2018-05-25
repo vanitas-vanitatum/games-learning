@@ -1,7 +1,8 @@
 import random
 
 from src.game.action import Action
-from src.game.nxn_tictactoe import TicTacToe, Board
+from src.game.tictactoe import TicTacToe
+from src.game.board import Board
 
 
 class Player:

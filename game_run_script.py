@@ -1,11 +1,10 @@
 NxN = True
-from pprint import pprint
 
 if NxN:
-    from src.game.nxn_tictactoe import TicTacToe, Board
+    from src.game.tictactoe import TicTacToe
+    from src.game.board import Board
     from src.game.player import HumanPlayer, RandomPlayer
-    from src.game.qplayer import QPlayer
-    from src.qlearning import Learner
+    from src.qlearning import QPlayer, Learner
 
     q = QPlayer(1)
     #q2 = QPlayer(1)
