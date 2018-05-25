@@ -1,5 +1,9 @@
 import random
 import numpy as np
+from collections import namedtuple
+from src.game.rewards import Reward
+
+Action = namedtuple("Action", ["row", "col"])
 
 
 class Board:
@@ -120,6 +124,7 @@ class Board:
         return 0 <= row < self.n and 0 <= col < self.n
 
     def get_legal_moves(self):
+
         moves = []
         for row in range(self.n):
             for col in range(self.n):
@@ -136,6 +141,20 @@ class Board:
                 if state[row * n + col] == Board.EMPTY:
                     moves += [(row, col)]
         return moves
+
+    def is_state_terminal(self, player_symbol = None):
+        if self.is_board_full():
+            return True
+        if player_symbol:
+            check = lambda r, c: self.is_move_winning(r, c, player_symbol)
+        else:
+            check = lambda r, c: (self.is_move_winning(r, c, Board.X)
+                                  or self.is_move_winning(r, c, Board.O))
+        for row in range(self.n):
+            for col in range(self.n):
+                if check(row, col):
+                    return True
+        return False
 
     def display_board(self):
         out = ""
@@ -167,7 +186,7 @@ class TicTacToe:
         self.player_x_turn = None
         self.game_finished = False
 
-    def play_game(self, player_x_starts=None, display=True):
+    def play_game(self, player_x_starts=None, display=True, verbose=False):
         self.start_game(player_x_starts)
 
         if display:
@@ -183,20 +202,23 @@ class TicTacToe:
             else:
                 player, symbol, opponent, opponent_symbol = self.player_o, Board.O, self.player_x, Board.X
 
-            if player.breed == "human" and display:
+            if display and (player.breed == "human" or verbose):
                 self.board.display_board()
 
             action = player.move(self.board)
             reward = self.apply_action(action)
             multiplier = self.moving_player_to_multiplier(symbol)
+            self.change_turns()
             player.reward(reward * multiplier, self.board.board_state())
             opponent.reward(reward * -multiplier, self.board.board_state())
-            self.player_x_turn = not self.player_x_turn
-            self.board.change_moving_player()
 
         if display:
             print('Game finished')
             self.board.display_board()
+
+    def change_turns(self):
+        self.player_x_turn = not self.player_x_turn
+        self.board.change_moving_player()
 
     def start_game(self, player_x_starts=None):
         self.player_x.start_game(Board.X)
@@ -213,23 +235,23 @@ class TicTacToe:
         else:
             self.board.moving_player = Board.O
 
-    def is_game_terminal(self):
+    def is_terminal(self):
         return self.game_finished
 
     def apply_action(self, action):
-        row, col, symbol = action
+        row, col = action
         if self.board.get(row, col) != Board.EMPTY:
             self.game_finished = True
-            return -99
-        self.board.set(row, col, symbol)
-        if self.board.is_move_winning(row, col, symbol):
+            return Reward.ILLEGAL
+        self.board.set(row, col, self.board.moving_player)
+        if self.board.is_move_winning(row, col, self.board.moving_player):
             self.game_finished = True
-            return 10 if symbol == self.board.moving_player else -10
+            return Reward.WIN if self.board.moving_player == self.board.moving_player else Reward.LOOSE
         elif self.board.is_board_full():
             self.game_finished = True
-            return 0.5
+            return Reward.DRAW
         else:
-            return 0
+            return Reward.NONE
 
     def moving_player_to_multiplier(self, moving_symbol):
         return 1 if (self.player_x_turn and moving_symbol == Board.X) or (

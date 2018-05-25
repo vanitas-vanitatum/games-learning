@@ -2,7 +2,8 @@ import numpy as np
 import tqdm
 
 from src.game.nxn_tictactoe import TicTacToe, Board
-from src.game.player import QPlayer
+from src.game.qplayer import QPlayer
+from src.game.rewards import Reward
 
 
 class Learner:
@@ -30,41 +31,49 @@ class Learner:
             self.evaluate_episode(episode)
             # self.update_player_values()
 
-    def update_player_values(self, previous_state, new_state, action, reward):
-        new_state_value = self.player_to_learn.get_max_q_value_for_state(self.game.board)
-        current_qvalue = self.player_to_learn.get_q_value(previous_state, action)
-
-        updated_value = current_qvalue + self.learning_rate * (
-                reward + self.temporary_discount * new_state_value - current_qvalue)
-
-        self.player_to_learn.set_value(
-            previous_state, action, updated_value
-        )
-        self.temporary_discount *= self.discount
-
     def evaluate_episode(self, episode_num):
         self.game.start_game()
-        while not self.game.is_game_terminal():
+        is_terminal = False
+        while not is_terminal:
             current_state = self.game.board.board_state()
-            if self.game.player_x_turn:
-                player = self.game.player_x
+            player = self.game.player_x if self.game.player_x_turn else self.game.player_o
+            enemy = self.game.player_o if self.game.player_x_turn else self.game.player_x
+            eps_threshold = self.epsilon_threshold(episode_num)
+            if self._rng.uniform() > eps_threshold:
+                try:
+                    action = player.move(self.game.board, rand=False)
+                except IndexError:
+                    action = player.move(self.game.board, rand=True)
+                    self.game.board.display_board()
             else:
-                player = self.game.player_o
-            sample = self._rng.uniform()
-            eps_threshold = self.epsilon_final_value + (self.epsilon_initial_value - self.epsilon_final_value) * np.exp(
-                -1 * episode_num / self.decay_step)
-            if sample > eps_threshold:
-                action = player.move(self.game.board)
-            else:
-                action = player.get_random_action_for_state(self.game.board)
-            # action = player.move(self.game.board)
+                action = player.move(self.game.board, rand=True)
+
             reward = self.game.apply_action(action)
-            self.game.board.change_moving_player()
-            self.game.player_x_turn = not self.game.player_x_turn
-            new_state = self.game.board.board_state()
-            self.update_player_values(current_state, new_state, action, reward)
-            # import ipdb
-            # ipdb.set_trace()
+            self.game.change_turns()
+
+            is_terminal = self.game.is_terminal()
+            self.update_Q_values(player, enemy, reward, self.game.board, is_terminal)
+
+    def epsilon_threshold(self, episode_num):
+        return (self.epsilon_final_value
+                + ((self.epsilon_initial_value - self.epsilon_final_value)
+                   * np.exp(-1 * episode_num / self.decay_step)))
+
+    def update_Q_values(self, player, enemy, reward, new_board, is_terminal):
+        if is_terminal:
+            if reward == Reward.DRAW:
+                player.update_Q(reward, new_board, self.learning_rate, self.temporary_discount)
+                enemy.update_Q(reward, new_board, self.learning_rate, self.temporary_discount)
+            else:
+                player.update_Q(reward, new_board, self.learning_rate, self.temporary_discount)
+                enemy.update_Q(-reward, new_board, self.learning_rate, self.temporary_discount)
+        if reward == Reward.ILLEGAL:
+            player.update_Q(reward, new_board, self.learning_rate, self.temporary_discount)
+
+        elif reward == Reward.NONE:
+            enemy.update_Q(-reward, new_board, self.learning_rate, self.temporary_discount)
+
+        self.temporary_discount *= self.discount
 
 
 if __name__ == '__main__':
