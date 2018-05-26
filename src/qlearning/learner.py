@@ -1,19 +1,20 @@
 import numpy as np
 import tqdm
 
-from src.game.nxn_tictactoe import TicTacToe, Board
-from src.game.player import QPlayer
+from src.game.tictactoe import TicTacToe
+from src.game.board import Board
+from src.qlearning.qplayer import QPlayer
+from src.game.rewards import Reward
+import random
 
 
 class Learner:
-    def __init__(self, game, player_to_learn, learning_rate=0.1, discount=0.9, seed=None):
-        assert isinstance(player_to_learn, QPlayer)
+    def __init__(self, game, learning_rate=0.3, discount=0.9, seed=None):
         self.game = game
-        self.player_to_learn = player_to_learn
         self.steps_done = 0
 
-        self.epsilon_initial_value = 0.9
-        self.epsilon_final_value = 0.05
+        self.epsilon_initial_value = 0.2
+        self.epsilon_final_value = 0.2
         self.decay_step = 200
 
         self.learning_rate = learning_rate
@@ -23,48 +24,72 @@ class Learner:
 
     def reset(self):
         self.temporary_discount = self.discount
+        plx = self.game.player_x
+        self.game.player_x = self.game.player_o
+        self.game.player_o = plx
 
     def fit(self, num_episodes):
+        results = []
         for episode in tqdm.tqdm(range(num_episodes)):
             self.reset()
-            self.evaluate_episode(episode)
-            # self.update_player_values()
-
-    def update_player_values(self, previous_state, new_state, action, reward):
-        new_state_value = self.player_to_learn.get_max_q_value_for_state(self.game.board)
-        current_qvalue = self.player_to_learn.get_q_value(previous_state, action)
-
-        updated_value = current_qvalue + self.learning_rate * (
-                reward + self.temporary_discount * new_state_value - current_qvalue)
-
-        self.player_to_learn.set_value(
-            previous_state, action, updated_value
-        )
-        self.temporary_discount *= self.discount
+            results.append(self.evaluate_episode(episode))
+        starting_players, winners = list(zip(*results))
+        return list(starting_players), list(winners)
 
     def evaluate_episode(self, episode_num):
-        self.game.start_game()
-        while not self.game.is_game_terminal():
-            current_state = self.game.board.board_state()
-            if self.game.player_x_turn:
-                player = self.game.player_x
+        self.game.start_game(self.player_x_starts(episode_num))
+        starting_player = Board.X if self.game.player_x_turn else Board.O
+        is_terminal = False
+        while not is_terminal:
+            player = self.game.player_x if self.game.player_x_turn else self.game.player_o
+            enemy = self.game.player_o if self.game.player_x_turn else self.game.player_x
+
+            eps_threshold = self.epsilon_threshold(episode_num)
+            if self._rng.uniform() > eps_threshold:
+                action = player.move(self.game.board, rand=False)
             else:
-                player = self.game.player_o
-            sample = self._rng.uniform()
-            eps_threshold = self.epsilon_final_value + (self.epsilon_initial_value - self.epsilon_final_value) * np.exp(
-                -1 * episode_num / self.decay_step)
-            if sample > eps_threshold:
-                action = player.move(self.game.board)
-            else:
-                action = player.get_random_action_for_state(self.game.board)
-            # action = player.move(self.game.board)
+                action = player.move(self.game.board, rand=True)
+
             reward = self.game.apply_action(action)
-            self.game.board.change_moving_player()
-            self.game.player_x_turn = not self.game.player_x_turn
-            new_state = self.game.board.board_state()
-            self.update_player_values(current_state, new_state, action, reward)
-            # import ipdb
-            # ipdb.set_trace()
+            self.game.change_turns()
+            is_terminal = self.game.is_terminal()
+
+            self.update_Q_values(player, enemy, reward, self.game.board, is_terminal)
+        winner = self.game.board.get_winner()
+        if winner is None:
+            winner = 0
+        return starting_player, winner
+
+    def player_x_starts(self, episode_num):
+        # return None
+        # return episode_num % 6 < 3
+        return random.choice([True, False])
+
+    def epsilon_threshold(self, episode_num):
+        return (self.epsilon_final_value
+                + ((self.epsilon_initial_value - self.epsilon_final_value)
+                   * np.exp(-1 * episode_num / self.decay_step)))
+
+    def update_Q_values(self, player, enemy, reward, new_board, is_terminal):
+        default = lambda r, b, lr, td: None
+        player_update_Q = player.update_Q if isinstance(player, QPlayer) else default
+        enemy_update_Q = enemy.update_Q if isinstance(enemy, QPlayer) else default
+
+        if reward == Reward.WIN:
+            player_update_Q(reward, new_board, self.learning_rate, self.temporary_discount)
+            enemy_update_Q(-reward, new_board, self.learning_rate, self.temporary_discount)
+
+        elif reward == Reward.DRAW:
+            player_update_Q(reward, new_board, self.learning_rate, self.temporary_discount)
+            enemy_update_Q(reward, new_board, self.learning_rate, self.temporary_discount)
+
+        elif reward == Reward.ILLEGAL:
+            player_update_Q(reward, new_board, self.learning_rate, self.temporary_discount)
+
+        elif reward == Reward.NONE:
+            enemy_update_Q(reward, new_board, self.learning_rate, self.temporary_discount)
+
+        # self.temporary_discount *= self.discount
 
 
 if __name__ == '__main__':

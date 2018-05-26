@@ -1,22 +1,20 @@
 import random
-from collections import defaultdict
-from itertools import groupby
-
-import numpy as np
 
 from src.game.action import Action
-from src.game.nxn_tictactoe import TicTacToe, Board
+from src.game.tictactoe import TicTacToe
+from src.game.board import Board
 
 
 class Player:
     def __init__(self, breed='none'):
         self.breed = breed
-        self.my_symb = None
-        self.enemy_symb = None
+        # self.my_symb = None
+        # self.enemy_symb = None
 
     def start_game(self, symbol):
-        self.my_symb = symbol
-        self.enemy_symb = Board.O if symbol == Board.X else Board.X
+        pass
+        # self.my_symb = symbol
+        # self.enemy_symb = Board.O if symbol == Board.X else Board.X
 
     def move(self, board):
         raise NotImplementedError
@@ -24,7 +22,8 @@ class Player:
     def reward(self, value, board):
         raise NotImplementedError
 
-    def available_moves(self, board):
+    @staticmethod
+    def available_moves(board):
         return board.get_legal_moves()
 
 
@@ -34,9 +33,8 @@ class HumanPlayer(Player):
 
     def move(self, board):
         row_col = input("Your move? ")
-
         row, col = map(int, row_col.split(','))
-        return Action(row, col, self.my_symb)
+        return Action(row, col)
 
     def reward(self, value, board):
         print("{} rewarded: {}".format(self.breed, value))
@@ -49,76 +47,15 @@ class RandomPlayer(Player):
     def reward(self, value, board):
         pass
 
-    def move(self, board):
+    def move(self, board, rand=False):
         row, col = random.choice(self.available_moves(board))
-        return Action(row, col, self.my_symb)
+        return Action(row, col)
 
-
-class QPlayer(Player):
-    def __init__(self, q_initial_value=0.0):
-        super().__init__('qplayer')
-        self.state_action_mapping = defaultdict(lambda: float(q_initial_value))
-        self.q_initial_value = q_initial_value
-
-    def get_max_action_for_state(self, state):
-        action_value_mapping = self.get_action_value_for_state(state)
-        best_moves = []
-        best_value = -np.inf
-        for action, qvalue in action_value_mapping.items():
-            if qvalue > best_value:
-                best_value = qvalue
-                best_moves = [action]
-            elif qvalue == best_value:
-                best_moves.append(action)
-        return random.choice(best_moves)
-
-    def get_max_q_value_for_state(self, board):
-        all_actions = [
-            Action(row, col, self.my_symb) for row, col in board.get_legal_moves()
-        ]
-        max_value = -np.inf
-        state = board.board_state()
-        for act in all_actions:
-            max_value = max(max_value, self.state_action_mapping[(state, act)])
-        return max_value
-
-    def get_action_value_for_state(self, board):
-        all_actions = [
-            Action(row, col, self.my_symb) for row, col in board.get_legal_moves()
-        ]
-        result = {}
-        state = board.board_state()
-        for (s, action), value in self.state_action_mapping.items():
-            if s == state:
-                result[action] = value
-        for act in all_actions:
-            if act not in result:
-                result[act] = self.q_initial_value
-
-        return result
-
-    def get_random_action_for_state(self, board):
-        all_actions = [
-            Action(row, col, self.my_symb) for row, col in board.get_legal_moves()
-        ]
-        return random.choice(all_actions)
-
-    def add_value(self, state, action, value):
-        self.state_action_mapping[(state, action)] += value
-
-    def set_value(self, state, action, value):
-        self.state_action_mapping[(state, action)] = value
-
-    def get_q_value(self, state, action):
-        return self.state_action_mapping[(state, action)]
-
-    def move(self, board):
-        return self.get_max_action_for_state(board)
-
-    def reward(self, value, board):
+    def update_Q(self, reward, new_board, learning_rate, temporary_discount):
         pass
 
 
+'''
 class MinMaxPlayer(Player):
     def __init__(self):
         super().__init__('minimax')
@@ -134,7 +71,7 @@ class MinMaxPlayer(Player):
         for move in self.available_moves(board):
             board[move] = self.my_symb
             optimal = self.minmax(board, self.enemy_symb, -2, 2)
-            board[move] = TicTacToe.EMPTY
+            board[move] = Board.EMPTY
             if optimal > best_yet:
                 choices = [move]
                 best_yet = optimal
@@ -152,9 +89,9 @@ class MinMaxPlayer(Player):
             return 0
         for move in self.available_moves(board):
             board[move] = symbol
-            other = TicTacToe.O if symbol == TicTacToe.X else TicTacToe.X
+            other = Board.O if symbol == Board.X else Board.X
             val = self.minmax(board, other, alpha, beta)
-            board[move] = TicTacToe.EMPTY
+            board[move] = Board.EMPTY
             if symbol == self.my_symb:
                 if val > alpha:
                     alpha = val
@@ -172,3 +109,4 @@ class MinMaxPlayer(Player):
 
     def reward(self, value, board):
         pass
+'''
