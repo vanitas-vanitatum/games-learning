@@ -1,11 +1,12 @@
+import random
+
 import numpy as np
 import tqdm
 
-from src.game.tictactoe import TicTacToe
 from src.game.board import Board
-from src.qlearning.qplayer import QPlayer
 from src.game.rewards import Reward
-import random
+from src.game.tictactoe import TicTacToe
+from src.qlearning.qplayer import QPlayer
 
 
 class Learner:
@@ -89,10 +90,8 @@ class Learner:
         elif reward == Reward.NONE:
             enemy_update_Q(reward, new_board, self.learning_rate, self.temporary_discount)
 
-        # self.temporary_discount *= self.discount
-
 
 if __name__ == '__main__':
     player_1 = QPlayer()
-    learner = Learner(TicTacToe(Board(3), player_1, player_1), player_1)
-    learner.fit(1000, 0.1, 0.99)
+    learner = Learner(TicTacToe(Board(3), player_1, player_1))
+    learner.fit(1000)

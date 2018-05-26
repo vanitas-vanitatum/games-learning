@@ -276,3 +276,4 @@ venv.bak/
 # End of https://www.gitignore.io/api/c++,java,python,kotlin,pycharm+all,intellij+all,jupyternotebook
 /experiments/*
 /temp
+*.h5

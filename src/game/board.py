@@ -63,7 +63,14 @@ class Board:
                     moves += [(row, col)]
         return moves
 
-    def is_state_terminal(self, player_symbol = None):
+    def get_legal_moves_mask(self):
+        if self.winner is not None:
+            return []
+        moves = np.zeros((len(self.data),))
+        moves[np.array(self.data) == Board.EMPTY] = 1
+        return moves.astype(np.bool)
+
+    def is_state_terminal(self, player_symbol=None):
         if self.is_board_full():
             return True
 
