@@ -277,3 +277,4 @@ venv.bak/
 /experiments/*
 /temp
 *.h5
+/logdir

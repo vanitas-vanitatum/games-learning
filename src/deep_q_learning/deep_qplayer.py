@@ -23,9 +23,7 @@ class DeepQPlayer(QPlayer):
 
     def get_max_action_for_state(self, board):
         q_s = self.predict_function([np.array([board.board_state()])])[0][0]
-        legal_moves = board.get_legal_moves_mask()
         actions = [Action(ind // board.n, ind % board.n) for ind in range(len(q_s))]
-        q_s[np.logical_not(legal_moves)] = -np.inf
 
         mx_q = np.max(q_s)
         best_moves = [action for action, q_value in zip(actions, q_s) if q_value == mx_q]
@@ -50,9 +48,8 @@ class DeepQPlayer(QPlayer):
         return loss
 
     def get_possible_q_values_for_board(self, board):
-        mask = board.get_legal_moves_mask()
         actions_q_values = self.predict_function([np.array([board.board_state()])])[0]
-        return actions_q_values * mask
+        return actions_q_values
 
     def save_Q(self, file_name):  # save table
         self.train_model.save(file_name)

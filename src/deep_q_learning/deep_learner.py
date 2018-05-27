@@ -2,12 +2,14 @@ import random
 
 import numpy as np
 import tqdm
+import tensorflow as tf
 
 from src.deep_q_learning.deep_qplayer import DeepQPlayer
 from src.deep_q_learning.memory import ReplayMemory, Transition
 from src.game.board import Board
 from src.game.rewards import Reward
 from src.game.tictactoe import TicTacToe
+from collections import deque
 
 
 class DeepLearner:
@@ -15,9 +17,9 @@ class DeepLearner:
         self.game = game
         self.steps_done = 0
 
-        self.epsilon_initial_value = 0.2
-        self.epsilon_final_value = 0.2
-        self.decay_step = 200
+        self.epsilon_initial_value = 0.6
+        self.epsilon_final_value = 0.1
+        self.decay_step = 1000
 
         self.discount = discount
 
@@ -25,9 +27,13 @@ class DeepLearner:
         self.memory_size = memory_size
         self.batch_size = batch_size
 
+        self.episode_history = deque(maxlen=100)
+        self.summary_writer = tf.summary.FileWriter('logdir')
+
         self._rng = np.random.RandomState(seed)
 
     def reset(self):
+        self.episode_history.clear()
         self.game.player_x, self.game.player_o = self.game.player_o, self.game.player_x
 
     def fit(self, num_episodes):
@@ -35,6 +41,12 @@ class DeepLearner:
         for episode in tqdm.tqdm(range(num_episodes)):
             self.reset()
             results.append(self.evaluate_episode(episode))
+
+            self.summary_writer.add_summary(
+                tf.Summary(value=[tf.Summary.Value(tag='average episode reward', simple_value=np.mean(self.episode_history)),
+                                  tf.Summary.Value(tag='epsilon', simple_value=self.epsilon_threshold(episode))]),
+                episode
+            )
         starting_players, winners = list(zip(*results))
         return list(starting_players), list(winners)
 
@@ -56,6 +68,7 @@ class DeepLearner:
                 action = player.move(self.game.board, rand=True)
 
             reward = self.game.apply_action(action)
+
             is_terminal = self.game.is_terminal()
 
             current_player_previous_state, current_player_previous_action = player.get_last_state_action_as_player(
@@ -76,7 +89,6 @@ class DeepLearner:
                                                     current_player,
                                                     is_terminal)
                     self.memory.add_transition(transition_future)
-
                     self.memory.add_transition(transition_current)
 
                 elif reward == Reward.DRAW:
@@ -98,7 +110,13 @@ class DeepLearner:
                                                           np.array(self.game.board.board_state()), reward,
                                                           future_moving_player,
                                                           is_terminal))
-
+                elif reward == Reward.ILLEGAL:
+                    self.memory.add_transition(Transition(np.array(current_player_previous_state),
+                                                          current_player_previous_action.row * self.game.board.n + current_player_previous_action.col,
+                                                          np.array(self.game.board.board_state()), reward,
+                                                          current_player,
+                                                          is_terminal))
+                self.episode_history.append(reward)
             if not self.memory.is_enough_memory_for_players(self.batch_size):
                 continue
 
