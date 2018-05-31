@@ -41,8 +41,9 @@ class Learner:
         starting_player = Board.X if self.game.player_x_turn else Board.O
         is_terminal = False
         while not is_terminal:
-            player = self.game.player_x if self.game.player_x_turn else self.game.player_o
-            enemy = self.game.player_o if self.game.player_x_turn else self.game.player_x
+            player, enemy = ((self.game.player_x, self.game.player_o)
+                             if self.game.player_x_turn
+                             else (self.game.player_o, self.game.player_x))
 
             eps_threshold = self.epsilon_threshold(episode_num)
             if self._rng.uniform() > eps_threshold:
@@ -75,24 +76,16 @@ class Learner:
         player_update_Q = player.update_Q if isinstance(player, QPlayer) else default
         enemy_update_Q = enemy.update_Q if isinstance(enemy, QPlayer) else default
 
-        if reward == Reward.WIN:
-            player_update_Q(reward, new_board, self.learning_rate, self.temporary_discount)
-            enemy_update_Q(-reward, new_board, self.learning_rate, self.temporary_discount)
+        if reward == Reward.NONE:
+            enemy_update_Q(reward, new_board, self.learning_rate, self.temporary_discount)
 
         elif reward == Reward.DRAW:
             player_update_Q(reward, new_board, self.learning_rate, self.temporary_discount)
             enemy_update_Q(reward, new_board, self.learning_rate, self.temporary_discount)
 
+        elif reward == Reward.WIN:
+            player_update_Q(reward, new_board, self.learning_rate, self.temporary_discount)
+            enemy_update_Q(-reward, new_board, self.learning_rate, self.temporary_discount)
+
         elif reward == Reward.ILLEGAL:
             player_update_Q(reward, new_board, self.learning_rate, self.temporary_discount)
-
-        elif reward == Reward.NONE:
-            enemy_update_Q(reward, new_board, self.learning_rate, self.temporary_discount)
-
-        # self.temporary_discount *= self.discount
-
-
-if __name__ == '__main__':
-    player_1 = QPlayer()
-    learner = Learner(TicTacToe(Board(3), player_1, player_1), player_1)
-    learner.fit(1000, 0.1, 0.99)

@@ -4,6 +4,8 @@ from src.game.player import HumanPlayer, RandomPlayer
 from src.qlearning import QPlayer, Learner
 
 qA = QPlayer(1)
-starters, winners = Learner(TicTacToe(Board(3, 3), qA, qA)).fit(10000)
+starters, winners = Learner(TicTacToe(Board(3, 3), qA, qA)).fit(100000)
 t = TicTacToe(Board(3, 3), HumanPlayer(), qA)
 t.play_game()
+
+
