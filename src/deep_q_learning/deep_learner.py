@@ -145,8 +145,10 @@ class DeepLearner:
         player_transitions_batch = self.memory.sample_for_player(self.batch_size, current_moving_player)
         enemy_transitions_batch = self.memory.sample_for_player(self.batch_size, future_moving_player)
 
-        player_update_q(player_transitions_batch, self.discount)
-        enemy_update_q(enemy_transitions_batch, self.discount)
+        batch = player_transitions_batch + enemy_transitions_batch
+        np.random.shuffle(batch)
+        player_update_q(batch, self.discount)
+#        enemy_update_q(enemy_transitions_batch, self.discount)
 
 
 if __name__ == '__main__':

@@ -1,9 +1,15 @@
-from collections import namedtuple, deque
+from collections import namedtuple, deque, Counter
 from src.game.board import Board
-
+from src.game.rewards import Reward
 import numpy as np
 
 Transition = namedtuple('Transition', ['previous_state', 'action', 'next_state', 'reward', 'player', 'is_terminal_state'])
+
+PROBABS = {Reward.DRAW: 0.2,
+           Reward.WIN: 0.3,
+           Reward.LOOSE: 0.3,
+           Reward.NONE: 0.1,
+           Reward.ILLEGAL: 0.1}
 
 
 class ReplayMemory:
@@ -33,11 +39,9 @@ class ReplayMemory:
             collection = self.player_x
         else:
             collection = self.player_o
-        sampled_indices = self._rng.randint(0, len(collection), size=batch_size)
-        batch = []
-        for ind in sampled_indices:
-            value = collection[ind]
-            batch.append(value)
+        probs = np.asarray([PROBABS[x.reward] for x in collection])
+        probs = probs/probs.sum()
+        batch = np.random.choice(collection, size=batch_size, p=probs)
         return batch
 
     def is_enough_memory_for_players(self, batch_size):
