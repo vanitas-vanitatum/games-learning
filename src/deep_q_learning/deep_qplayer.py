@@ -23,10 +23,12 @@ class DeepQPlayer(QPlayer):
 
     def get_max_action_for_state(self, board):
         q_s = self.predict_function([np.array([board.board_state()])])[0][0]
-        actions = [Action(ind // board.n, ind % board.n) for ind in range(len(q_s))]
+        actions = board.get_legal_moves()
 
         mx_q = np.max(q_s)
-        best_moves = [action for action, q_value in zip(actions, q_s) if q_value == mx_q]
+        action_qs = [q_s[act.row * board.n + act.col] for act in actions]
+        best_q = max(action_qs)
+        best_moves = [act for act, q in zip(actions, action_qs) if q == best_q]
         chosen = random.choice(best_moves)
         return chosen
 
@@ -45,6 +47,14 @@ class DeepQPlayer(QPlayer):
                     self.predict_function([next_states])[0], axis=1))
 
         loss = self.train_model.train_on_batch([previous_states, outputs, actions], np.ones((len(previous_states), 1)))
+        return loss
+
+    def update_q(self, previous_states, actions, y):
+
+        previous_states = np.array(previous_states)
+        actions = np.array(actions).reshape(-1,1)
+        y = np.array(y).reshape(-1,1)
+        loss = self.train_model.train_on_batch([previous_states, y, actions], np.ones((len(previous_states), 1)))
         return loss
 
     def get_possible_q_values_for_board(self, board):

@@ -33,5 +33,24 @@ def get_model_3x3():
     return model, predict_function
 
 
+def get_model_simple():
+    inputs = Input(shape=(10,), name='input')
+    action_input = Input(shape=(1,), name='actions', dtype='int32')
+    expected_state_values = Input(shape=(1,), name='expected')
+    layer = Dense(100)(inputs)
+    layer = Activation('relu')(layer)
+    #layer = Dropout(0.5)(layer)
+    #layer = Dense(96, activation='relu')(layer)
+    #layer = Activation('relu')(layer)
+    #layer = Dropout(0.5)(layer)
+    output = Dense(9, name='output')(layer)
+    last = Lambda(smooth_loss, output_shape=(1,), name='loss')([expected_state_values, output, action_input])
+
+    model = Model([inputs, expected_state_values, action_input], [last])
+    model.compile('adam', loss=lambda y_true, y_pred: y_pred)
+    model.summary()
+    predict_function = K.function([inputs], [output])
+    return model, predict_function
+
 if __name__ == '__main__':
     get_model_3x3()

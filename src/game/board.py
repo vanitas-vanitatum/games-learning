@@ -1,6 +1,6 @@
 import numpy as np
 from src.utils import hzcat
-
+from src.game.action import Action
 
 class Board:
     X = 1
@@ -60,7 +60,7 @@ class Board:
         for row in range(self.n):
             for col in range(self.n):
                 if self.get(row, col) == Board.EMPTY:
-                    moves += [(row, col)]
+                    moves += [Action(row, col)]
         return moves
 
     def get_legal_moves_mask(self):
