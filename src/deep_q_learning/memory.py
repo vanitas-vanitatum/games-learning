@@ -7,7 +7,7 @@ Transition = namedtuple('Transition', ['previous_state', 'action', 'next_state',
 
 PROBABS = {Reward.DRAW: 0.2,
            Reward.WIN: 0.3,
-           Reward.LOOSE: 0.3,
+           -Reward.WIN: 0.3,
            Reward.NONE: 0.1,
            Reward.ILLEGAL: 0.1}
 
@@ -41,7 +41,11 @@ class ReplayMemory:
             collection = self.player_o
         probs = np.asarray([PROBABS[x.reward] for x in collection])
         probs = probs/probs.sum()
-        batch = np.random.choice(collection, size=batch_size, p=probs)
+        sampled_indices = np.random.choice(range(len(collection)), size=batch_size, p=probs)
+        batch = []
+        for ind in sampled_indices:
+            value = collection[ind]
+            batch.append(value)
         return batch
 
     def is_enough_memory_for_players(self, batch_size):

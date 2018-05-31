@@ -152,8 +152,15 @@ class DeepLearner:
 
 
 if __name__ == '__main__':
+    from src.deep_q_learning.deep_qplayer import DeepQPlayer
+    from src.deep_q_learning.memory import ReplayMemory, Transition
+    from src.game.board import Board
+    from src.game.rewards import Reward
+    from src.game.tictactoe import TicTacToe
+    from src.game.player import HumanPlayer
     from src.deep_q_learning.model import get_model_3x3
 
     player_1 = DeepQPlayer(get_model_3x3())
     learner = DeepLearner(TicTacToe(Board(3), player_1, player_1))
-    learner.fit(1000)
+    res = learner.fit(1000)
+    t = TicTacToe(Board(3,3),player_1, HumanPlayer())
