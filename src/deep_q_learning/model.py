@@ -1,4 +1,4 @@
-from keras.layers import Conv2D, Flatten, Input, Dense, Lambda, Dropout, BatchNormalization, Activation
+from keras.layers import Conv2D, Flatten, Input, Dense, Lambda, Dropout, BatchNormalization, Activation, LeakyReLU
 from keras.models import Model
 from src.deep_q_learning.keras_extensions import smooth_loss, mean_squared_loss
 
@@ -18,13 +18,10 @@ def get_model_3x3():
     action_input = Input(shape=(1,), name='actions', dtype='int32')
     expected_state_values = Input(shape=(1,), name='expected')
     layer = Dense(128)(inputs)
-    layer = Activation('relu')(layer)
-    layer = Dropout(0.5)(layer)
-    layer = Dense(96, activation='relu')(layer)
-    layer = Activation('relu')(layer)
-    layer = Dropout(0.5)(layer)
+    layer = LeakyReLU()(layer)
+    # layer = Dropout(0.5)(layer)
     output = Dense(9, name='output')(layer)
-    last = Lambda(smooth_loss, output_shape=(1,), name='loss')([expected_state_values, output, action_input])
+    last = Lambda(mean_squared_loss, output_shape=(1,), name='loss')([expected_state_values, output, action_input])
 
     model = Model([inputs, expected_state_values, action_input], [last])
     model.compile('adam', loss=lambda y_true, y_pred: y_pred)

@@ -17,7 +17,7 @@ class DeepLearner:
         self.game = game
         self.steps_done = 0
 
-        self.epsilon_initial_value = 0.6
+        self.epsilon_initial_value = 0.9
         self.epsilon_final_value = 0.1
         self.decay_step = 1000
 

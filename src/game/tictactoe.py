@@ -38,8 +38,10 @@ class TicTacToe:
             if self.game_finished:
                 if reward == Reward.WIN:
                     winner = 'X' if self.board.get_winner() == Board.X else 'O'
-                else:
+                elif reward == Reward.DRAW:
                     winner = 'DRAW'
+                else:
+                    winner = "Illegal movement"
             self.change_turns()
 
             player.reward(reward, self.board.board_state())

@@ -15,5 +15,5 @@ def smooth_loss(args):
 def mean_squared_loss(args):
     y_true, y_pred, action_indices = args
     y_pred = K.gather(y_pred, action_indices)
-    diff = K.pow(y_true - y_pred, 2)
+    diff = 0.5 * K.pow(y_true - y_pred, 2)
     return K.mean(K.sum(diff, axis=1))

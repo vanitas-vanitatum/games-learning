@@ -41,8 +41,7 @@ class DeepQPlayer(QPlayer):
         mask_terminals = (1 - np.array(terminals))
 
         outputs = (np.ones(len(previous_states)) * rewards
-                   + mask_terminals * discount * np.max(
-                    self.predict_function([next_states])[0], axis=1))
+                   + mask_terminals * discount * np.max(self.predict_function([next_states])[0], axis=1))
 
         loss = self.train_model.train_on_batch([previous_states, outputs, actions], np.ones((len(previous_states), 1)))
         return loss
