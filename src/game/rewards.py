@@ -1,6 +1,6 @@
 class Reward:
-    WIN = 100
-    LOOSE = -1
-    DRAW = 10
+    WIN = 1
+    LOOSE = -0.01
+    DRAW = 0.1
     NONE = 0
-    ILLEGAL = -200
+    ILLEGAL = -0.1

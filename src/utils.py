@@ -1,3 +1,26 @@
+import tensorflow as tf
+import uuid
+
+from pathlib import Path
+
+
+class logger:
+    path = Path('logdir')
+    writer = tf.summary.FileWriter(str(path / str(uuid.uuid4())))
+    episode_counter = 0
+
+    @staticmethod
+    def add_tf_summary(summary, episode=None):
+        if episode is None:
+            logger.writer.add_summary(summary, logger.episode_counter)
+            logger.episode_counter += 1
+        else:
+            logger.writer.add_summary(summary, episode)
+            logger.episode_counter = episode
+
+    @staticmethod
+    def add_tf_summary_with_last_episode(summary):
+        logger.writer.add_summary(summary, logger.episode_counter)
 
 
 def hzcat(args, sep=''):

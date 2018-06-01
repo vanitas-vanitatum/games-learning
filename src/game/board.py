@@ -28,7 +28,10 @@ class Board:
         self.winner = None
 
     def board_state(self):
-        return tuple([self.moving_player] + self.data)
+        if self.moving_player == 0:
+            import ipdb
+            ipdb.set_trace()
+        return np.array(self.data) * self.moving_player
 
     def __str__(self):
         return BoardStringConverter().simple_convert(self)
@@ -87,6 +90,12 @@ class Board:
 
     def display_board(self):
         print(BoardStringConverter().convert(self))
+
+    @staticmethod
+    def display_custom_board(board_data):
+        new_board = Board()
+        new_board.data = board_data[1:]
+        print(BoardStringConverter().convert(new_board))
 
     def change_moving_player(self):
         self.moving_player = Board.X if self.moving_player == Board.O else Board.O

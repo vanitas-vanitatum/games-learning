@@ -9,26 +9,27 @@ from src.deep_q_learning.memory import ReplayMemory, Transition
 from src.game.board import Board
 from src.game.rewards import Reward
 from src.game.tictactoe import TicTacToe
+from src.utils import logger
 from collections import deque
 
 
 class DeepLearner:
-    def __init__(self, game, discount=0.9, batch_size=32, memory_size=1000, seed=None):
+    def __init__(self, game, discount=0.9, batch_size=32, memory_size=1000, target_net_update_episode=50, seed=None):
         self.game = game
         self.steps_done = 0
 
         self.epsilon_initial_value = 0.6
         self.epsilon_final_value = 0.1
-        self.decay_step = 1000
+        self.decay_step = 2500
 
         self.discount = discount
 
         self.memory = ReplayMemory(memory_size)
         self.memory_size = memory_size
         self.batch_size = batch_size
+        self.target_net_update_episode = target_net_update_episode
 
         self.episode_history = deque(maxlen=100)
-        self.summary_writer = tf.summary.FileWriter('logdir')
 
         self._rng = np.random.RandomState(seed)
 
@@ -41,8 +42,10 @@ class DeepLearner:
         for episode in tqdm.tqdm(range(num_episodes)):
             self.reset()
             results.append(self.evaluate_episode(episode))
+            if episode % self.target_net_update_episode and episode > 0:
+                self.game.player_x.refresh_target_net()
 
-            self.summary_writer.add_summary(
+            logger.add_tf_summary(
                 tf.Summary(value=[tf.Summary.Value(tag='average episode reward', simple_value=np.mean(self.episode_history)),
                                   tf.Summary.Value(tag='epsilon', simple_value=self.epsilon_threshold(episode))]),
                 episode
@@ -59,7 +62,6 @@ class DeepLearner:
             future_moving_player = Board.O if self.game.player_x_turn else Board.X
 
             player = self.game.player_x if self.game.player_x_turn else self.game.player_o
-            enemy = self.game.player_o if self.game.player_x_turn else self.game.player_x
 
             eps_threshold = self.epsilon_threshold(episode_num)
             if self._rng.uniform() > eps_threshold:
@@ -80,13 +82,11 @@ class DeepLearner:
                 if reward == Reward.WIN:
                     transition_future = Transition(np.array(future_player_previous_state),
                                                    future_player_previous_action.row * self.game.board.n + future_player_previous_action.col,
-                                                   np.array(self.game.board.board_state()), -reward,
-                                                   future_moving_player,
+                                                   np.array(self.game.board.board_state()), Reward.LOOSE,
                                                    is_terminal)
                     transition_current = Transition(np.array(current_player_previous_state),
                                                     current_player_previous_action.row * self.game.board.n + current_player_previous_action.col,
-                                                    np.array(self.game.board.board_state()), reward,
-                                                    current_player,
+                                                    np.array(self.game.board.board_state()), Reward.WIN,
                                                     is_terminal)
                     self.memory.add_transition(transition_future)
                     self.memory.add_transition(transition_current)
@@ -94,33 +94,29 @@ class DeepLearner:
                 elif reward == Reward.DRAW:
                     self.memory.add_transition(Transition(np.array(future_player_previous_state),
                                                           future_player_previous_action.row * self.game.board.n + future_player_previous_action.col,
-                                                          np.array(self.game.board.board_state()), reward,
-                                                          future_moving_player,
+                                                          np.array(self.game.board.board_state()) * future_moving_player, Reward.DRAW,
                                                           is_terminal))
 
                     self.memory.add_transition(Transition(np.array(current_player_previous_state),
                                                           current_player_previous_action.row * self.game.board.n + current_player_previous_action.col,
-                                                          np.array(self.game.board.board_state()), reward,
-                                                          current_player,
+                                                          np.array(self.game.board.board_state()), Reward.DRAW,
                                                           is_terminal))
 
                 elif reward == Reward.NONE:
                     self.memory.add_transition(Transition(np.array(future_player_previous_state),
                                                           future_player_previous_action.row * self.game.board.n + future_player_previous_action.col,
-                                                          np.array(self.game.board.board_state()), reward,
-                                                          future_moving_player,
+                                                          np.array(self.game.board.board_state()), Reward.NONE,
                                                           is_terminal))
                 elif reward == Reward.ILLEGAL:
                     self.memory.add_transition(Transition(np.array(current_player_previous_state),
                                                           current_player_previous_action.row * self.game.board.n + current_player_previous_action.col,
-                                                          np.array(self.game.board.board_state()), reward,
-                                                          current_player,
+                                                          np.array(self.game.board.board_state()), Reward.ILLEGAL,
                                                           is_terminal))
                 self.episode_history.append(reward)
             if not self.memory.is_enough_memory_for_players(self.batch_size):
                 continue
 
-            self.update_q_values(player, enemy, current_player, future_moving_player)
+            self.update_q_values(player)
         winner = self.game.board.get_winner()
         if winner is None:
             winner = 0
@@ -135,18 +131,9 @@ class DeepLearner:
                 + ((self.epsilon_initial_value - self.epsilon_final_value)
                    * np.exp(-1 * episode_num / self.decay_step)))
 
-    def update_q_values(self, player, enemy, current_moving_player, future_moving_player):
-        def default(r, b, td):
-            return None
-
-        player_update_q = player.update_q_model if isinstance(player, DeepQPlayer) else default
-        enemy_update_q = enemy.update_q_model if isinstance(enemy, DeepQPlayer) else default
-
-        player_transitions_batch = self.memory.sample_for_player(self.batch_size, current_moving_player)
-        enemy_transitions_batch = self.memory.sample_for_player(self.batch_size, future_moving_player)
-
-        player_update_q(player_transitions_batch, self.discount)
-        enemy_update_q(enemy_transitions_batch, self.discount)
+    def update_q_values(self, player):
+        batch = self.memory.sample(self.batch_size)
+        player.update_q_model(batch, self.discount)
 
 
 if __name__ == '__main__':
