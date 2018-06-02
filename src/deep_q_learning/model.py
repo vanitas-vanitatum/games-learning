@@ -34,7 +34,7 @@ def get_model_3x3():
 
 
 def create_actor_model():
-    state_input = Input(shape=9, name='input')
+    state_input = Input(shape=(9,), name='input')
     layer = Dense(128, kernel_regularizer=l2(0.0001))(state_input)
     layer = LeakyReLU()(layer)
     layer = Dense(96, kernel_regularizer=l2(0.0001))(layer)
@@ -42,23 +42,21 @@ def create_actor_model():
     output = Dense(9, name='output', activation='relu', kernel_regularizer=l2(0.0001))(layer)
 
     model = Model(inputs=[state_input], outputs=[output])
-    model.compile(Adam(), loss='mse')
     return state_input, model
 
 
 def create_critic_model():
-    state_input = Input(shape=9, name='input')
+    state_input = Input(shape=(9,), name='input')
     state_h1 = Dense(128, activation='relu')(state_input)
     state_h2 = Dense(48)(state_h1)
 
-    action_input = Input(shape=9, name='action_input')
+    action_input = Input(shape=(9,), name='action_input')
     action_h1 = Dense(48)(action_input)
 
     merged = Add()([state_h2, action_h1])
     merged_h1 = Dense(24, activation='relu')(merged)
     output = Dense(1, activation='relu')(merged_h1)
     model = Model(inputs=[state_input, action_input], outputs=[output])
-    model.compile(Adam(), loss='mse')
     return state_input, action_input, model
 
 

@@ -28,10 +28,7 @@ class Board:
         self.winner = None
 
     def board_state(self):
-        if self.moving_player == 0:
-            import ipdb
-            ipdb.set_trace()
-        return np.array(self.data) * self.moving_player
+        return np.array([self.moving_player] + self.data)
 
     def __str__(self):
         return BoardStringConverter().simple_convert(self)
