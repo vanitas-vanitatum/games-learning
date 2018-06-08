@@ -1,6 +1,6 @@
 from keras.layers import Conv2D, Flatten, Input, Dense, Lambda, Dropout, BatchNormalization, Activation
 from keras.models import Model
-from src.deep_q_learning.keras_extensions import smooth_loss, mean_squared_loss
+from src.deep_q_learning.keras_extensions import mse_loss, mean_squared_loss
 
 import keras.backend as K
 
@@ -24,7 +24,7 @@ def get_model_3x3():
     layer = Activation('relu')(layer)
     layer = Dropout(0.5)(layer)
     output = Dense(9, name='output')(layer)
-    last = Lambda(smooth_loss, output_shape=(1,), name='loss')([expected_state_values, output, action_input])
+    last = Lambda(mse_loss, output_shape=(1,), name='loss')([expected_state_values, output, action_input])
 
     model = Model([inputs, expected_state_values, action_input], [last])
     model.compile('adam', loss=lambda y_true, y_pred: y_pred)
@@ -34,7 +34,7 @@ def get_model_3x3():
 
 
 def get_model_simple():
-    inputs = Input(shape=(10,), name='input')
+    inputs = Input(shape=(9,), name='input')
     action_input = Input(shape=(1,), name='actions', dtype='int32')
     expected_state_values = Input(shape=(1,), name='expected')
     layer = Dense(100)(inputs)
@@ -44,7 +44,7 @@ def get_model_simple():
     #layer = Activation('relu')(layer)
     #layer = Dropout(0.5)(layer)
     output = Dense(9, name='output')(layer)
-    last = Lambda(smooth_loss, output_shape=(1,), name='loss')([expected_state_values, output, action_input])
+    last = Lambda(mse_loss, output_shape=(1,), name='loss')([expected_state_values, output, action_input])
 
     model = Model([inputs, expected_state_values, action_input], [last])
     model.compile('adam', loss=lambda y_true, y_pred: y_pred)

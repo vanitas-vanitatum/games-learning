@@ -15,10 +15,10 @@ BOARD_SIZE = 9
 #     loss = 0.5 * K.pow(diff, 2) * positive_mask + (abs_diff - 0.5) * (1 - positive_mask)
 #     return K.mean(K.sum(loss, axis=1))
 
-def smooth_loss(args):
+def mse_loss(args):
     y_true, y_pred, action_indices = args
-    action_indices = tf.one_hot(action_indices, BOARD_SIZE)
-    y_pred = tf.reduce_sum(tf.multiply(y_pred, action_indices), axis=1)
+    action_indices = K.reshape(tf.one_hot(action_indices, BOARD_SIZE), (-1, BOARD_SIZE))
+    y_pred = K.reshape(tf.reduce_sum(tf.multiply(y_pred, action_indices), axis=1), (-1, 1))
     diff = y_true - y_pred
     sqr_diff = tf.square(diff)
     return tf.reduce_mean(sqr_diff)

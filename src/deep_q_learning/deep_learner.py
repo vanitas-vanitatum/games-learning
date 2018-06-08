@@ -1,4 +1,6 @@
 import random
+from datetime import datetime
+
 
 import numpy as np
 import tqdm
@@ -13,24 +15,23 @@ from collections import deque
 
 
 class DeepLearner:
-    def __init__(self, game, discount=0.8, batch_size=32, memory_size=1000, seed=None):
+    def __init__(self, game, discount=0.8,
+                 epsilon_initial_value=1.0,
+                 epsilon_final_value=0.01,
+                 decay_step=3000,
+                 seed=None):
         self.game = game
         self.steps_done = 0
 
-        self.epsilon_initial_value = 1.0
-        self.epsilon_final_value = 0.01
-        self.decay_step = 5000
+        self.epsilon_initial_value = epsilon_initial_value
+        self.epsilon_final_value = epsilon_final_value
+        self.decay_step = decay_step
         self.epsilon_step = (self.epsilon_initial_value - self.epsilon_final_value) / self.decay_step
 
         self.discount = discount
 
-        self.memory = ReplayMemory(memory_size)
-        self.memory_size = memory_size
-        self.batch_size = batch_size
-
         self.episode_history = deque(maxlen=100)
-        self.summary_writer = tf.summary.FileWriter('logdir')
-
+        self.summary_writer = tf.summary.FileWriter(f'logdir/{datetime.now().strftime("%Y%m%d-%H%M%S")}')
         self._rng = np.random.RandomState(seed)
 
     def reset(self):
@@ -38,74 +39,66 @@ class DeepLearner:
         self.game.player_x, self.game.player_o = self.game.player_o, self.game.player_x
 
     def fit(self, num_episodes):
-        results = []
+        starters, winners = [], []
         for episode in tqdm.tqdm(range(num_episodes)):
             self.reset()
-            res  = self.evaluate_episode(episode)
-            res, loss = (res[0], res[1]), res[2]
-            results.append(res)
-            if episode % 100 == 0:
-                print(f'Loss {loss.mean()}')
+            starter, winner, loss = self.evaluate_episode(episode)
+            starters.append(starter)
+            winners.append(winner)
 
+            if episode % 100 == 0:
+                print(f'Loss: {loss}')
             self.summary_writer.add_summary(
-                tf.Summary(value=[tf.Summary.Value(tag='average episode reward', simple_value=np.mean(self.episode_history)),
-                                  tf.Summary.Value(tag='epsilon', simple_value=self.epsilon_threshold(episode))]),
-                episode
-            )
-        starting_players, winners = list(zip(*results))
-        return list(starting_players), list(winners)
+                tf.Summary(
+                    value=[tf.Summary.Value(tag='average episode reward', simple_value=np.mean(self.episode_history)),
+                           tf.Summary.Value(tag='epsilon', simple_value=self.epsilon_threshold(episode)),
+                           tf.Summary.Value(tag='loss', simple_value=loss),
+                           tf.Summary.Value(tag='starter', simple_value=starter),
+                           tf.Summary.Value(tag='winner', simple_value=winner)]),
+                episode)
+        return starters, winners
 
     def evaluate_episode(self, episode_num):
-        losses = []
-        sar_prev = [(None, None, None), (None, None, None)]  # [(s, a, r(a)), (s(a), o, r(o)]
+        sar_prev = [(None, None, None),
+                    (None, None, None)]  # [(s, a, r(a)), (s(a), o, r(o)]
 
         self.game.start_game(self.player_x_starts())
         starting_player = Board.X if self.game.player_x_turn else Board.O
         is_terminal = False
+        loss = 0
         while not is_terminal:
-            current_player = Board.X if self.game.player_x_turn else Board.O
-            #future_moving_player = Board.O if self.game.player_x_turn else Board.X
             player = self.game.player_x if self.game.player_x_turn else self.game.player_o
-            #enemy = self.game.player_o if self.game.player_x_turn else self.game.player_x
             state = self.game.board.board_state()
+
             q = player.get_possible_q_values_for_board(self.game.board)
             q_max = q.max()
-            eps_threshold = self.epsilon_threshold(episode_num)
-            if self._rng.uniform() > eps_threshold:
-                action = player.move(self.game.board, rand=False)
-            else:
-                action = player.move(self.game.board, rand=True)
+
+            action = self.epsilon_strategy(player, episode_num)
             a = action.row * self.game.board.n + action.col
 
             s_prev, a_prev, r_prev = sar_prev.pop(0)
 
             if s_prev is not None:
-                transformer = StateActionTransformer(s_prev, a_prev, self.game.board.n)
-                s_prev, a_prev = transformer.generate_transforms()
+                s_prev, a_prev = self.generate_transformations(s_prev, a_prev)
                 y_prev = r_prev + self.discount * q_max
-                loss = player.update_q(s_prev,
-                                       a_prev, [y_prev]*len(s_prev))
+                loss = player.update_q(s_prev, a_prev, [y_prev] * len(s_prev))
+
             reward = self.game.apply_action(action)
-            new_state = self.game.board.board_state()
             is_terminal = self.game.is_terminal()
 
             if is_terminal:
                 s_prev, a_prev, r_prev = sar_prev[-1]
-                y = reward
+                s_prev, a_prev = self.generate_transformations(s_prev, a_prev)
                 y_prev = r_prev - self.discount * reward
 
-                transformer = StateActionTransformer(s_prev, a_prev, self.game.board.n)
-                s_prev, a_prev = transformer.generate_transforms()
-
-                transformer = StateActionTransformer(state, a, self.game.board.n)
-                s, a = transformer.generate_transforms()
+                stt, act = self.generate_transformations(state, a)
+                y = reward
 
                 # Update Q network
-                s_up = s + s_prev
-                a_up = a + a_prev
-                y_up = [y] * len(s) + [y_prev] * len(s_prev)
-                loss = player.update_q(s_up, a_up, y_up)
-                losses.append(loss.mean())
+                s_batch = stt + s_prev
+                a_batch = act + a_prev
+                y_batch = [y] * len(stt) + [y_prev] * len(s_prev)
+                loss = player.update_q(s_batch, a_batch, y_batch)
 
             sar_prev.append((state, a, reward))
 
@@ -115,18 +108,31 @@ class DeepLearner:
         winner = self.game.board.get_winner()
         if winner is None:
             winner = 0
-        return starting_player, winner, np.asarray(losses)
+        return starting_player, winner, np.asarray(loss).mean()
+
+    def epsilon_strategy(self, player, episode_num):
+        eps_threshold = self.epsilon_threshold(episode_num)
+        if self._rng.uniform() > eps_threshold:
+            action = player.move(self.game.board, rand=False)
+        else:
+            action = player.move(self.game.board, rand=True)
+        return action
+
+    def generate_transformations(self, state, action):
+        transformer = StateActionTransformer(state, action, self.game.board.n)
+        return transformer.generate_transforms()
 
     @classmethod
     def player_x_starts(cls):
         return random.choice([True, False])
 
     def epsilon_threshold(self, episode_num):
-#        return (self.epsilon_final_value
-#                + ((self.epsilon_initial_value - self.epsilon_final_value)
-#                   * np.exp(-1 * episode_num / self.decay_step)))
-        return (self.epsilon_initial_value
-                - self.epsilon_step * min(episode_num, self.decay_step))
+        return (self.epsilon_final_value
+                + ((self.epsilon_initial_value - self.epsilon_final_value)
+                   * np.exp(-1 * episode_num / self.decay_step)))
+
+    #         return (self.epsilon_initial_value
+    #                 - self.epsilon_step * min(episode_num, self.decay_step))
 
     def update_q_values(self, player, enemy, current_moving_player, future_moving_player):
         def default(r, b, td):
@@ -141,6 +147,8 @@ class DeepLearner:
         batch = player_transitions_batch + enemy_transitions_batch
         np.random.shuffle(batch)
         player_update_q(batch, self.discount)
+
+
 #        enemy_update_q(enemy_transitions_batch, self.discount)
 
 
