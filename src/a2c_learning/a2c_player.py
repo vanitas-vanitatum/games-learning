@@ -59,7 +59,7 @@ class A2CPlayer(QPlayer):
         chosen = random.choice(best_moves)
         return chosen
 
-    def update_models(self, transitions_batch, discount):
+    def update_models(self, transitions_batch, discount, log=False):
         if len(transitions_batch) == 0:
             return
         transitions_batch = transitions_batch[::-1]
@@ -81,14 +81,14 @@ class A2CPlayer(QPlayer):
                 feed_dict={
                     self.policy_network_input: [current_state],
                     self.value_network_input: [current_state],
-                    self.current_reward: current_reward
+                    self.current_reward: [current_reward]
                 }
             )
             value_gradients, value_loss = self.sess.run(
                 [self.value_network_grads, self.value_loss],
                 feed_dict={
                     self.value_network_input: [current_state],
-                    self.current_reward: current_reward
+                    self.current_reward: [current_reward]
                 }
             )
 
@@ -115,13 +115,14 @@ class A2CPlayer(QPlayer):
             }
         )
 
-        logger.add_tf_summary_with_last_episode(
-            tf.Summary(
-                value=[tf.Summary.Value(tag='loss/policy', simple_value=
-                                        np.mean(cummulative_policy_loss)),
-                       tf.Summary.Value(tag='loss/value', simple_value=
-                                        np.mean(cummulative_value_loss))]),
-        )
+        if log:
+            logger.add_tf_summary_with_last_episode(
+                tf.Summary(
+                    value=[tf.Summary.Value(tag='loss/policy', simple_value=
+                                            np.mean(cummulative_policy_loss)),
+                           tf.Summary.Value(tag='loss/value', simple_value=
+                                            np.mean(cummulative_value_loss))]),
+            )
 
     def get_possible_q_values_for_board(self, board):
         actions_q_values = self.predict_function(

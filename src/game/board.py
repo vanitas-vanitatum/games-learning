@@ -28,7 +28,7 @@ class Board:
         self.winner = None
 
     def board_state(self):
-        return np.array([self.moving_player] + self.data)
+        return np.array(self.data)
 
     def __str__(self):
         return BoardStringConverter().simple_convert(self)
