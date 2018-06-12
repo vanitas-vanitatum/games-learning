@@ -43,7 +43,7 @@ def get_model_simple():
     #layer = Dense(96, activation='relu')(layer)
     #layer = Activation('relu')(layer)
     #layer = Dropout(0.5)(layer)
-    output = Dense(9, name='output')(layer)
+    output = Dense(9, name='output', activation='tanh')(layer)
     last = Lambda(mse_loss, output_shape=(1,), name='loss')([expected_state_values, output, action_input])
 
     model = Model([inputs, expected_state_values, action_input], [last])

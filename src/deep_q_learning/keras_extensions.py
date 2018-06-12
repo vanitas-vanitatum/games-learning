@@ -11,7 +11,7 @@ BOARD_SIZE = 9
 #     diff = y_true - y_pred
 #     abs_diff = K.abs(diff)
 #     positive_mask = K.cast(abs_diff <= 1, K.floatx())
-#
+#diff
 #     loss = 0.5 * K.pow(diff, 2) * positive_mask + (abs_diff - 0.5) * (1 - positive_mask)
 #     return K.mean(K.sum(loss, axis=1))
 

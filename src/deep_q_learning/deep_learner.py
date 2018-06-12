@@ -41,6 +41,7 @@ class DeepLearner:
     def fit(self, num_episodes):
         starters, winners = [], []
         master_table = []
+        an_append = master_table.append
         for episode in tqdm.tqdm(range(num_episodes)):
             self.reset()
             result = self.evaluate_episode(episode)
@@ -60,10 +61,10 @@ class DeepLearner:
                            tf.Summary.Value(tag='starter', simple_value=starter),
                            tf.Summary.Value(tag='winner', simple_value=winner)]),
                 episode)
-            master_table.append(result)
-            if episode % 500 and episode > 0:
+            an_append(result)
+            if episode % 500 == 0 and episode > 0:
                 pd.DataFrame(master_table).to_csv('deepqlearning_analysis.csv', index=False)
-                player_1.save_Q('weights.h5')
+                player_1.save_Q(f'weights/weights_{episode}.h5')
         pd.DataFrame(master_table).to_csv('deepqlearning_analysis.csv', index=False)
         return starters, winners
 
@@ -281,8 +282,8 @@ if __name__ == '__main__':
     player_1 = DeepQPlayer(get_model_simple())
     learner = DeepLearner(TicTacToe(Board(3), player_1, player_1),
                           epsilon_initial_value=0.6,
-                          epsilon_final_value=0.01,
-                          decay_step=5000)
+                          epsilon_final_value=0.1,
+                          decay_step=10000)
     res = learner.fit(100000)
     t = TicTacToe(Board(3, 3), player_1, HumanPlayer())
     player_1.save_Q('100000_epochs_0.6_e0_0.01_e_20000_decay.h5')
