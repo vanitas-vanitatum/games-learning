@@ -1,17 +1,17 @@
 import random
 from datetime import datetime
 
-
 import numpy as np
 import tqdm
 import tensorflow as tf
+import pandas as pd
 
 from src.deep_q_learning.deep_qplayer import DeepQPlayer
 from src.deep_q_learning.memory import ReplayMemory, Transition
 from src.game.board import Board
 from src.game.rewards import Reward
 from src.game.tictactoe import TicTacToe
-from collections import deque
+from collections import deque, defaultdict
 
 
 class DeepLearner:
@@ -40,14 +40,18 @@ class DeepLearner:
 
     def fit(self, num_episodes):
         starters, winners = [], []
+        master_table = []
         for episode in tqdm.tqdm(range(num_episodes)):
             self.reset()
-            starter, winner, loss = self.evaluate_episode(episode)
-            starters.append(starter)
-            winners.append(winner)
+            result = self.evaluate_episode(episode)
+            starters.append(result['StartingPlayer'])
+            winners.append(result['Winner'])
 
             if episode % 100 == 0:
-                print(f'Loss: {loss}')
+                print(f'Loss: {result["MeanLoss"]}')
+            loss = result['MeanLoss']
+            starter = result['StartingPlayer']
+            winner = result['Winner']
             self.summary_writer.add_summary(
                 tf.Summary(
                     value=[tf.Summary.Value(tag='average episode reward', simple_value=np.mean(self.episode_history)),
@@ -56,6 +60,10 @@ class DeepLearner:
                            tf.Summary.Value(tag='starter', simple_value=starter),
                            tf.Summary.Value(tag='winner', simple_value=winner)]),
                 episode)
+            master_table.append(result)
+            if episode % 500 and episode > 0:
+                pd.DataFrame(master_table).to_csv('deepqlearning_analysis.csv', index=False)
+        pd.DataFrame(master_table).to_csv('deepqlearning_analysis.csv', index=False)
         return starters, winners
 
     def evaluate_episode(self, episode_num):
@@ -66,8 +74,12 @@ class DeepLearner:
         starting_player = Board.X if self.game.player_x_turn else Board.O
         is_terminal = False
         loss = 0
+        rewards_x = []
+        rewards_o = []
         while not is_terminal:
             player = self.game.player_x if self.game.player_x_turn else self.game.player_o
+            rewards_append = rewards_x.append if self.game.player_x_turn else rewards_o.append
+            enemy_reward_append = rewards_o.append if self.game.player_x_turn else rewards_x.append
             state = self.game.board.board_state()
 
             q = player.get_possible_q_values_for_board(self.game.board)
@@ -101,6 +113,8 @@ class DeepLearner:
                 loss = player.update_q(s_batch, a_batch, y_batch)
 
             sar_prev.append((state, a, reward))
+            rewards_append(reward)
+            enemy_reward_append(-reward)
 
             self.game.change_turns()
             self.episode_history.append(reward)
@@ -108,7 +122,14 @@ class DeepLearner:
         winner = self.game.board.get_winner()
         if winner is None:
             winner = 0
-        return starting_player, winner, np.asarray(loss).mean()
+        return {
+            'StartingPlayer': starting_player,
+            'Winner': winner,
+            'MeanRewardX': np.mean(rewards_x),
+            'MeanRewardO': np.mean(rewards_o),
+            'MeanLoss': np.asarray(loss).mean(),
+            'Epsilon': self.epsilon_threshold(episode_num)
+        }
 
     def epsilon_strategy(self, player, episode_num):
         eps_threshold = self.epsilon_threshold(episode_num)
@@ -257,6 +278,10 @@ if __name__ == '__main__':
     from src.deep_q_learning.model import get_model_3x3, get_model_simple
 
     player_1 = DeepQPlayer(get_model_simple())
-    learner = DeepLearner(TicTacToe(Board(3), player_1, player_1))
-    res = learner.fit(10000)
+    learner = DeepLearner(TicTacToe(Board(3), player_1, player_1),
+                          epsilon_initial_value=0.6,
+                          epsilon_final_value=0.01,
+                          decay_step=5000)
+    res = learner.fit(100000)
     t = TicTacToe(Board(3, 3), player_1, HumanPlayer())
+    player_1.save_Q('100000_epochs_0.6_e0_0.01_e_20000_decay.h5')
