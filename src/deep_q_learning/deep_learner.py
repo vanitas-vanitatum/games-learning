@@ -63,6 +63,7 @@ class DeepLearner:
             master_table.append(result)
             if episode % 500 and episode > 0:
                 pd.DataFrame(master_table).to_csv('deepqlearning_analysis.csv', index=False)
+                player_1.save_Q('weights.h5')
         pd.DataFrame(master_table).to_csv('deepqlearning_analysis.csv', index=False)
         return starters, winners
 
